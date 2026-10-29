@@ -1,0 +1,18 @@
+{
+  "name": "@watchtowerobservability/electron",
+  "version": "0.1.0",
+  "repository": { "type": "git", "url": "git+https://github.com/watchtowerobservability/watchtower-electron.git" },
+  "publishConfig": { "registry": "https://npm.pkg.github.com" },
+  "description": "Watchtower SDK for Electron: main and renderer errors, native crash minidumps, offline queue (plain JavaScript)",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "files": ["src"],
+  "exports": {
+    ".": { "types": "./src/index.d.ts", "default": "./src/index.js" },
+    "./preload": "./src/preload.js"
+  },
+  "license": "Apache-2.0",
+  "engines": { "node": ">=18" },
+  "peerDependencies": { "electron": ">=22" },
+  "scripts": { "test": "node --test test/" }
+}

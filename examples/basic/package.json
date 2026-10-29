@@ -1,0 +1,9 @@
+{
+  "name": "wt-electron-example",
+  "version": "0.0.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": { "start": "electron ." },
+  "dependencies": { "@watchtowerobservability/electron": "^0.1.0" },
+  "devDependencies": { "electron": "^33.0.0" }
+}

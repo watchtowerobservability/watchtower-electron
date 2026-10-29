@@ -1,0 +1,1 @@
+require('@watchtowerobservability/electron/preload');
