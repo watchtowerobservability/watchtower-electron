@@ -14,5 +14,5 @@
   "license": "Apache-2.0",
   "engines": { "node": ">=18" },
   "peerDependencies": { "electron": ">=22" },
-  "scripts": { "test": "node --test test/*.test.js" }
+  "scripts": { "test": "node test/run.js" }
 }
