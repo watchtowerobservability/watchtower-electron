@@ -1,13 +1,25 @@
-'use strict';
 // Sentry-compatible envelope framing, the wire format the Watchtower edge accepts at /api/<k>/envelope/.
-const crypto = require('node:crypto');
+import { randomUUID } from 'node:crypto';
 
 const MAX = 2048;
 
+export type Frame = { function: string; filename: string; lineno: number; colno: number };
+export type WtEvent = Record<string, unknown> & { event_id: string };
+export type EventOptions = {
+  release?: string | undefined;
+  environment?: string | undefined;
+  sdkVersion: string;
+  tags?: Record<string, string> | undefined;
+  level?: string | undefined;
+  process?: string | undefined;
+  mechanism?: string | undefined;
+  handled?: boolean | undefined;
+};
+
 /** wt.* is reserved: the gateway deletes it, so drop it here instead of losing it silently. */
-function safeMap(m) {
-  const out = {};
-  for (const [k, v] of Object.entries(m || {})) {
+export function safeMap(m: Record<string, unknown> | undefined | null): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(m ?? {})) {
     if (k.startsWith('wt.') || k.length > 128) continue;
     out[k] = typeof v === 'string' ? v.slice(0, MAX) : v;
   }
@@ -15,18 +27,18 @@ function safeMap(m) {
 }
 
 /** V8 stack text to Sentry frames (oldest call first, as the edge expects). */
-function parseStack(stack) {
-  const frames = [];
-  for (const line of String(stack || '').split('\n')) {
+export function parseStack(stack: unknown): Frame[] {
+  const frames: Frame[] = [];
+  for (const line of String(stack ?? '').split('\n')) {
     const m = /^\s*at (?:(.*?) \()?(.*?):(\d+):(\d+)\)?$/.exec(line);
-    if (m) frames.push({ function: m[1] || '?', filename: m[2], lineno: +m[3], colno: +m[4] });
+    if (m) frames.push({ function: m[1] || '?', filename: m[2] ?? '', lineno: Number(m[3]), colno: Number(m[4]) });
   }
   return frames.reverse();
 }
 
-function base(o, platform, level) {
+function base(o: EventOptions, platform: string, level: string) {
   return {
-    event_id: crypto.randomUUID().replace(/-/g, ''),
+    event_id: randomUUID().replace(/-/g, ''),
     timestamp: Date.now() / 1000,
     platform,
     level,
@@ -36,7 +48,7 @@ function base(o, platform, level) {
   };
 }
 
-function errorEvent(err, o) {
+export function errorEvent(err: unknown, o: EventOptions): WtEvent {
   const e = err instanceof Error ? err : new Error(typeof err === 'string' ? err : JSON.stringify(err));
   return {
     ...base(o, 'node', o.level || 'error'),
@@ -52,7 +64,7 @@ function errorEvent(err, o) {
   };
 }
 
-function crashEvent(o) {
+export function crashEvent(o: EventOptions): WtEvent {
   return {
     ...base(o, 'native', 'fatal'),
     tags: safeMap({ process: 'native', ...o.tags }),
@@ -60,12 +72,12 @@ function crashEvent(o) {
   };
 }
 
-function item(header, payload) {
+function item(header: Record<string, unknown>, payload: Buffer): Buffer {
   return Buffer.concat([Buffer.from(`${JSON.stringify({ ...header, length: payload.length })}\n`), payload, Buffer.from('\n')]);
 }
 
 /** One envelope: the event, plus an optional minidump attachment (`event.minidump`). */
-function envelope(event, minidump) {
+export function envelope(event: WtEvent, minidump?: Buffer): Buffer {
   const parts = [Buffer.from(`${JSON.stringify({ event_id: event.event_id, sent_at: new Date().toISOString() })}\n`)];
   parts.push(item({ type: 'event' }, Buffer.from(JSON.stringify(event))));
   if (minidump) {
@@ -73,5 +85,3 @@ function envelope(event, minidump) {
   }
   return Buffer.concat(parts);
 }
-
-module.exports = { envelope, errorEvent, crashEvent, parseStack, safeMap };

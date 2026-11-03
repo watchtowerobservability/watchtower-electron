@@ -1,12 +1,11 @@
 # @watchtowerobservability/electron
 
-Errors, native crash minidumps and an offline queue for Electron. Plain JavaScript with hand-written `.d.ts`,
-no runtime dependencies (`electron` is a peer).
+Errors, native crash minidumps and an offline queue for Electron. Written in TypeScript (types ship in
+`dist/`), no runtime dependencies (`electron` is a peer).
 
 ## Install
 
 ```sh
-echo '@watchtowerobservability:registry=https://npm.pkg.github.com' >> .npmrc
 npm install @watchtowerobservability/electron
 ```
 

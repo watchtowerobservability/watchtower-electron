@@ -1,30 +1,31 @@
-'use strict';
-const test = require('node:test');
-const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const main = require('../src/main');
-const { parseStack, safeMap, envelope, errorEvent } = require('../src/envelope');
-const { Queue } = require('../src/queue');
-const { install } = require('../src/renderer');
+import assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { test } from 'vitest';
+import * as main from '../src/main';
+import { envelope, errorEvent, parseStack, safeMap } from '../src/envelope';
+import { Queue } from '../src/queue';
+import { install } from '../src/renderer';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'wt-el-'));
 
-function fakeElectron(dir) {
-  const handlers = {};
-  return {
-    handlers,
-    app: { getPath: () => dir },
-    crashReporter: { start(o) { this.started = o; }, getCrashesDirectory: () => path.join(dir, 'Crashpad') },
-    ipcMain: { on: (c, f) => { handlers[c] = f; } },
+type Handler = (event: unknown, payload: unknown) => void;
+
+function fakeElectron(dir: string) {
+  const handlers: Record<string, Handler> = {};
+  const crashReporter = {
+    started: undefined as { uploadToServer: boolean } | undefined,
+    start(o: { submitURL: string; uploadToServer: boolean }) { crashReporter.started = o; },
+    getCrashesDirectory: () => path.join(dir, 'Crashpad'),
   };
+  return { handlers, app: { getPath: () => dir }, crashReporter, ipcMain: { on: (c: string, f: Handler) => { handlers[c] = f; } } };
 }
 
 test('parseStack reads V8 frames, oldest first', () => {
   const f = parseStack('Error: x\n    at foo (/a/b.js:10:5)\n    at /a/c.js:3:1');
   assert.deepStrictEqual(f[0], { function: '?', filename: '/a/c.js', lineno: 3, colno: 1 });
-  assert.strictEqual(f[1].function, 'foo');
+  assert.strictEqual(f[1]?.function, 'foo');
 });
 
 test('safeMap drops wt.* keys', () => {
@@ -41,7 +42,7 @@ test('envelope frames event and minidump attachment', () => {
 test('queue drains oldest first, keeps on 503, drops on 400', async () => {
   const q = new Queue(tmp());
   q.add(Buffer.from('a')); q.add(Buffer.from('b')); q.add(Buffer.from('c'));
-  const seen = [];
+  const seen: string[] = [];
   await q.drain(async (b) => { seen.push(b.toString()); return b.toString() === 'a' ? 400 : 503; });
   assert.deepStrictEqual(seen, ['a', 'b']);
   assert.strictEqual(q.list().length, 2);
@@ -56,20 +57,20 @@ test('queue trims oldest past the byte cap', () => {
 test('init: bearer key, masked output, renderer error over IPC, offline then flush', async () => {
   main._reset();
   const el = fakeElectron(tmp());
-  const calls = [];
+  const calls: { url: string; auth: string | undefined }[] = [];
   let online = false;
-  const fetch = async (url, init) => {
+  const fetch = async (url: string, init: { headers: Record<string, string> }) => {
     calls.push({ url, auth: init.headers.Authorization });
     return { status: online ? 200 : 503 };
   };
   const c = main.init({ publishableKey: 'pk_secret_value', endpoint: 'http://e:1/', captureUncaught: false }, el, { fetch });
-  assert.strictEqual(el.crashReporter.started.uploadToServer, false);
+  assert.strictEqual(el.crashReporter.started?.uploadToServer, false);
   assert.ok(!String(c).includes('pk_secret_value'));
   assert.ok(!JSON.stringify(c).includes('pk_secret_value'));
-  el.handlers['wt:error']({}, { name: 'TypeError', message: 'bad', stack: 'TypeError: bad\n    at f (/x.js:1:2)' });
+  el.handlers['wt:error']?.({}, { name: 'TypeError', message: 'bad', stack: 'TypeError: bad\n    at f (/x.js:1:2)' });
   await c.flush();
-  assert.strictEqual(calls[0].url, 'http://e:1/api/default/envelope/');
-  assert.strictEqual(calls[0].auth, 'Bearer pk_secret_value');
+  assert.strictEqual(calls[0]?.url, 'http://e:1/api/default/envelope/');
+  assert.strictEqual(calls[0]?.auth, 'Bearer pk_secret_value');
   assert.strictEqual(c.queue.list().length, 1);
   online = true;
   await c.flush();
@@ -91,7 +92,7 @@ test('init queues leftover minidumps and deletes them', () => {
   fs.writeFileSync(path.join(pending, 'a.dmp'), 'MDMP');
   const c = main.init({ publishableKey: 'k', captureUncaught: false }, fakeElectron(dir), { fetch: async () => ({ status: 503 }) });
   assert.strictEqual(fs.readdirSync(pending).length, 0);
-  assert.match(fs.readFileSync(path.join(c.queue.dir, c.queue.list()[0]), 'latin1'), /event\.minidump/);
+  assert.match(fs.readFileSync(path.join(c.queue.dir, c.queue.list()[0] ?? ''), 'latin1'), /event\.minidump/);
 });
 
 test('init requires a key', () => {
@@ -101,12 +102,12 @@ test('init requires a key', () => {
 });
 
 test('renderer forwards window errors', () => {
-  const l = {};
-  const sent = [];
+  const l: Record<string, (ev: { error?: unknown; reason?: unknown }) => void> = {};
+  const sent: { mechanism: string; name: string }[] = [];
   const cap = install({ addEventListener: (n, f) => { l[n] = f; } }, (p) => sent.push(p));
-  l.error({ error: new TypeError('x') });
-  l.unhandledrejection({ reason: 'nope' });
+  l.error?.({ error: new TypeError('x') });
+  l.unhandledrejection?.({ reason: 'nope' });
   cap(new Error('manual'));
   assert.deepStrictEqual(sent.map((s) => s.mechanism), ['onerror', 'unhandledrejection', 'generic']);
-  assert.strictEqual(sent[0].name, 'TypeError');
+  assert.strictEqual(sent[0]?.name, 'TypeError');
 });

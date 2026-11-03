@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Ported to TypeScript (owner rule 2026-10-30): sources in `src/*.ts`, compiled to `dist/` with generated `.d.ts`; public API unchanged.
+
 ## 0.1.0
 
 - Main-process error capture (uncaughtException, unhandledRejection, `captureException`).

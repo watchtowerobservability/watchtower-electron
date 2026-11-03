@@ -1,18 +1,31 @@
 {
   "name": "@watchtowerobservability/electron",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": { "type": "git", "url": "git+https://github.com/watchtowerobservability/watchtower-electron.git" },
-  "publishConfig": { "registry": "https://npm.pkg.github.com" },
-  "description": "Watchtower SDK for Electron: main and renderer errors, native crash minidumps, offline queue (plain JavaScript)",
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
-  "files": ["src"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "description": "Watchtower SDK for Electron: main and renderer errors, native crash minidumps, offline queue (TypeScript)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
   "exports": {
-    ".": { "types": "./src/index.d.ts", "default": "./src/index.js" },
-    "./preload": "./src/preload.js"
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./preload": { "types": "./dist/preload.d.ts", "default": "./dist/preload.js" }
   },
   "license": "Apache-2.0",
   "engines": { "node": ">=18" },
   "peerDependencies": { "electron": ">=22" },
-  "scripts": { "test": "node test/run.js" }
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.0",
+    "typescript": "5.7.2",
+    "vitest": "5.0.5"
+  }
 }
