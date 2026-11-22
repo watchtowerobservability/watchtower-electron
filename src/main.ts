@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { crashEvent, envelope, errorEvent, type EventOptions, type WtEvent } from './envelope';
 import { Queue } from './queue';
 
-const SDK_VERSION = '0.2.0';
+const SDK_VERSION = '0.2.1';
 const DEFAULT_ENDPOINT = 'http://localhost:4318';
 const MAX_FIELD = 4096;
 
